@@ -83,6 +83,7 @@ dependencies {
   compile fileTree(include: ['*.jar'], dir: 'libs')
   compile "com.facebook.react:react-native:+"  // From node_modules
   compile 'me.leolin:ShortcutBadger:1.1.18@aar'
+  compile 'com.android.support:support-compat:26.1.0'
   compile "com.google.android.gms:play-services-base:$firebaseVersion"
   compile "com.google.firebase:firebase-core:$firebaseVersion"
   compile "com.google.firebase:firebase-config:$firebaseVersion"

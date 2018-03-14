@@ -4,6 +4,7 @@ import android.app.AlarmManager;
 import android.app.Application;
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.app.NotificationChannel;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -62,7 +63,22 @@ public class RNFirebaseLocalMessagingHelper {
         title = mContext.getPackageManager().getApplicationLabel(appInfo).toString();
       }
 
-      NotificationCompat.Builder notification = new NotificationCompat.Builder(mContext)
+      NotificationManager notificationManager =
+        (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+
+      String channelId = null;
+      if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        channelId = "default";
+        if(notificationManager.getNotificationChannel(channelId) == null) {
+          int importance = NotificationManager.IMPORTANCE_HIGH;
+          NotificationChannel mChannel = new NotificationChannel(channelId, channelId, importance);
+          mChannel.setDescription(channelId);
+          mChannel.enableLights(true);
+          mChannel.setShowBadge(true);
+          notificationManager.createNotificationChannel(mChannel);
+        }
+      }
+      NotificationCompat.Builder notification = new NotificationCompat.Builder(mContext, channelId)
         .setContentTitle(title)
         .setContentText(bundle.getString("body"))
         .setTicker(bundle.getString("ticker"))
@@ -74,6 +90,10 @@ public class RNFirebaseLocalMessagingHelper {
         .setVibrate(new long[]{0, DEFAULT_VIBRATION})
         .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
         .setExtras(bundle.getBundle("data"));
+
+      NotificationCompat.Builder summaryNotification = new NotificationCompat.Builder(mContext, channelId)
+        .setGroup(bundle.getString("group"))
+        .setGroupSummary(true);
 
       //priority
       String priority = bundle.getString("priority", "");
@@ -95,6 +115,7 @@ public class RNFirebaseLocalMessagingHelper {
       String smallIcon = bundle.getString("icon", "ic_launcher");
       int smallIconResId = res.getIdentifier(smallIcon, "mipmap", packageName);
       notification.setSmallIcon(smallIconResId);
+      summaryNotification.setSmallIcon(smallIconResId);
 
       //large icon
       String largeIcon = bundle.getString("large_icon");
@@ -102,12 +123,14 @@ public class RNFirebaseLocalMessagingHelper {
         if (largeIcon.startsWith("http://") || largeIcon.startsWith("https://")) {
           Bitmap bitmap = getBitmapFromURL(largeIcon);
           notification.setLargeIcon(bitmap);
+          summaryNotification.setLargeIcon(bitmap);
         } else {
           int largeIconResId = res.getIdentifier(largeIcon, "mipmap", packageName);
           Bitmap largeIconBitmap = BitmapFactory.decodeResource(res, largeIconResId);
 
           if (largeIconResId != 0) {
             notification.setLargeIcon(largeIconBitmap);
+            summaryNotification.setLargeIcon(largeIconBitmap);
           }
         }
       }
@@ -166,21 +189,26 @@ public class RNFirebaseLocalMessagingHelper {
         intent.setAction(bundle.getString("click_action"));
 
         int notificationID = bundle.containsKey("id") ? bundle.getString("id", "").hashCode() : (int) System.currentTimeMillis();
+        int groupID = bundle.containsKey("group") ? bundle.getString("group", "").hashCode() : (int) System.currentTimeMillis();
         PendingIntent pendingIntent = PendingIntent.getActivity(mContext, notificationID, intent,
           PendingIntent.FLAG_UPDATE_CURRENT);
-
-        NotificationManager notificationManager =
-          (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
 
         notification.setContentIntent(pendingIntent);
 
         Notification info = notification.build();
+        Notification groupInfo = summaryNotification.build();
 
         if (bundle.containsKey("tag")) {
           String tag = bundle.getString("tag");
           notificationManager.notify(tag, notificationID, info);
+          if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            notificationManager.notify(tag, groupID, groupInfo);
+          }
         } else {
           notificationManager.notify(notificationID, info);
+          if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            notificationManager.notify(groupID, groupInfo);
+          }
         }
       }
       //clear out one time scheduled notification once fired
